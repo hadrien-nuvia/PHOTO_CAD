@@ -36,6 +36,7 @@ dev = [
 
 [project.scripts]
 convert-orthophoto-to-dxf = "src.cli:main"
+convert-orthophoto-to-dxf-gui = "src.gui:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
