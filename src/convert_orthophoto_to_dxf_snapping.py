@@ -7,10 +7,16 @@ try:
     from .core.snapping import snap_lines
     from .core.dxf_export import export_to_dxf, export_to_geojson
 except ImportError:
-    from core.raster import read_image, detect_edges
-    from core.vectorize import detect_lines
-    from core.snapping import snap_lines
-    from core.dxf_export import export_to_dxf, export_to_geojson
+    try:
+        from core.raster import read_image, detect_edges
+        from core.vectorize import detect_lines
+        from core.snapping import snap_lines
+        from core.dxf_export import export_to_dxf, export_to_geojson
+    except ImportError:
+        from src.core.raster import read_image, detect_edges
+        from src.core.vectorize import detect_lines
+        from src.core.snapping import snap_lines
+        from src.core.dxf_export import export_to_dxf, export_to_geojson
 
 
 def convert_orthophoto_to_dxf(
