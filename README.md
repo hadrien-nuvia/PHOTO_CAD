@@ -225,6 +225,7 @@ pyinstaller --name="OrthophotoToDXF" ^
   --hidden-import="threading" ^
   --hidden-import="traceback" ^
   --hidden-import="atexit" ^
+  --hidden-import="tkinter" ^
   --collect-all cv2 ^
   --collect-all numpy ^
   --collect-all ezdxf ^
@@ -247,6 +248,7 @@ pyinstaller --name="OrthophotoToDXF" \
   --hidden-import="threading" \
   --hidden-import="traceback" \
   --hidden-import="atexit" \
+  --hidden-import="tkinter" \
   --collect-all cv2 \
   --collect-all numpy \
   --collect-all ezdxf \
