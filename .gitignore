@@ -49,6 +49,9 @@ htmlcov/
 *.geojson
 test_output.*
 
+# Learning system
+feedback_history.json
+
 # Temporary files
 *.log
 *.tmp
