@@ -9,7 +9,10 @@ import threading
 try:
     from .convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
 except ImportError:
-    from convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
+    try:
+        from convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
+    except ImportError:
+        from src.convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
 
 
 class OrthoPhotoConverterGUI:
