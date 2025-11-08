@@ -45,6 +45,7 @@ class OrthoPhotoConverterGUI:
         self.worker_thread = None
         self.is_running = False
         self.message_queue = queue.Queue()
+        self._cleanup_done = False
 
         # Set up proper cleanup handlers
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -223,7 +224,7 @@ class OrthoPhotoConverterGUI:
             row=0, column=1, padx=5
         )
 
-        ttk.Button(button_frame, text="Exit", command=self.root.quit, width=15).grid(
+        ttk.Button(button_frame, text="Exit", command=self.on_closing, width=15).grid(
             row=0, column=2, padx=5
         )
 
@@ -421,12 +422,19 @@ class OrthoPhotoConverterGUI:
                     callback()
                 except queue.Empty:
                     break
+                except Exception as e:
+                    # Log individual callback errors but continue processing
+                    print(f"Error in queue callback: {e}", file=sys.stderr)
         except Exception as e:
             print(f"Error processing queue: {e}", file=sys.stderr)
         finally:
-            # Schedule next check
-            if self.root and self.root.winfo_exists():
-                self.root.after(100, self.process_queue)
+            # Schedule next check - only if window still exists and we're not shutting down
+            try:
+                if self.root and self.root.winfo_exists():
+                    self.root.after(100, self.process_queue)
+            except tk.TclError:
+                # Window is being destroyed, stop scheduling
+                pass
 
     def on_closing(self):
         """Handle window close event."""
@@ -435,14 +443,29 @@ class OrthoPhotoConverterGUI:
                 "Quit", "A conversion is in progress. Are you sure you want to quit?"
             ):
                 self.cleanup()
-                self.root.destroy()
+                # Use destroy instead of quit for cleaner shutdown
+                try:
+                    self.root.destroy()
+                except tk.TclError:
+                    # Window already destroyed
+                    pass
         else:
             self.cleanup()
-            self.root.destroy()
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                # Window already destroyed
+                pass
 
     def cleanup(self):
         """Clean up resources before exit."""
+        # Prevent multiple cleanup calls
+        if hasattr(self, '_cleanup_done') and self._cleanup_done:
+            return
+
+        self._cleanup_done = True
         self.is_running = False
+
         # Wait for worker thread to finish (with timeout)
         if self.worker_thread and self.worker_thread.is_alive():
             self.worker_thread.join(timeout=2.0)
@@ -450,16 +473,37 @@ class OrthoPhotoConverterGUI:
 
 def main():
     """Main entry point for the GUI application."""
+    root = None
     try:
         root = tk.Tk()
-        OrthoPhotoConverterGUI(root)  # Keep reference in root widget
+        OrthoPhotoConverterGUI(root)  # noqa: F841 - GUI instance attached to root
         root.mainloop()
+    except KeyboardInterrupt:
+        # Handle Ctrl+C gracefully
+        print("\nInterrupted by user", file=sys.stderr)
+        if root:
+            try:
+                root.destroy()
+            except tk.TclError:
+                pass
+        sys.exit(0)
     except Exception as e:
         # Catch any uncaught exceptions at top level
         print(f"Fatal error: {e}", file=sys.stderr)
         traceback.print_exc()
-        messagebox.showerror("Fatal Error", f"Application error:\n{str(e)}")
+        try:
+            messagebox.showerror("Fatal Error", f"Application error:\n{str(e)}")
+        except Exception:
+            # If messagebox fails (e.g., no display), just print
+            pass
         sys.exit(1)
+    finally:
+        # Ensure cleanup happens
+        if root:
+            try:
+                root.quit()
+            except tk.TclError:
+                pass
 
 
 if __name__ == "__main__":
