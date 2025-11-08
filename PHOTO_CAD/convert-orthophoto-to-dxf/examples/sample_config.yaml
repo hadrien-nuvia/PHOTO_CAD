@@ -1,0 +1,24 @@
+# Sample configuration for convert-orthophoto-to-dxf project
+
+input_image: "path/to/your/input/image.jpg"
+output_dxf: "path/to/your/output/file.dxf"
+output_geojson: "path/to/your/output/file.geojson"
+
+# Processing parameters
+raster_processing:
+  grayscale: true
+  threshold: 128
+
+vectorization:
+  edge_detection: true
+  line_smoothing: true
+
+snapping:
+  snap_to_grid: true
+  grid_size: 10
+
+# DXF export options
+dxf_export:
+  layer_name: "Orthophoto Layer"
+  line_color: "0,0,255"  # RGB format
+  line_weight: 0.5
