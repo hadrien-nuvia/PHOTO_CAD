@@ -1,7 +1,0 @@
-numpy
-opencv-python
-ezdxf
-pyyaml
-scikit-image
-matplotlib
-pytest
