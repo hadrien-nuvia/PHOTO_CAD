@@ -12,11 +12,14 @@ import atexit
 # Support both relative imports (when used as module) and absolute imports (when run directly)
 try:
     from .convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
+    from .learning import LearningSystem
 except ImportError:
     try:
         from convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
+        from learning import LearningSystem
     except ImportError:
         from src.convert_orthophoto_to_dxf_snapping import convert_orthophoto_to_dxf
+        from src.learning import LearningSystem
 
 
 class OrthoPhotoConverterGUI:
@@ -26,7 +29,7 @@ class OrthoPhotoConverterGUI:
         """Initialize the GUI."""
         self.root = root
         self.root.title("Orthophoto to DXF Converter")
-        self.root.geometry("700x600")
+        self.root.geometry("700x650")
         self.root.resizable(True, True)
 
         # Variables
@@ -40,6 +43,14 @@ class OrthoPhotoConverterGUI:
         self.min_line_length = tk.IntVar(value=100)
         self.max_line_gap = tk.IntVar(value=10)
         self.enable_geojson = tk.BooleanVar(value=False)
+        self.use_learned = tk.BooleanVar(value=False)
+
+        # Learning system
+        self.learning_system = LearningSystem()
+        
+        # Last conversion result
+        self.last_result = None
+        self.last_parameters = None
 
         # Thread management
         self.worker_thread = None
@@ -55,6 +66,9 @@ class OrthoPhotoConverterGUI:
 
         # Start message queue processing
         self.process_queue()
+        
+        # Load learned parameters on startup if available
+        self.load_learned_parameters()
 
     def create_widgets(self):
         """Create and layout all GUI widgets."""
@@ -103,18 +117,43 @@ class OrthoPhotoConverterGUI:
         params_frame = ttk.LabelFrame(main_frame, text="Parameters", padding="10")
         params_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
 
+        # Use learned parameters checkbox
         row = 0
+        learned_frame = ttk.Frame(params_frame)
+        learned_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+        
+        ttk.Checkbutton(
+            learned_frame, 
+            text="Use learned parameters from feedback",
+            variable=self.use_learned,
+            command=self.on_use_learned_changed
+        ).grid(row=0, column=0, sticky=tk.W)
+        
+        ttk.Button(
+            learned_frame,
+            text="View Stats",
+            command=self.show_statistics,
+            width=12
+        ).grid(row=0, column=1, padx=10)
+
+        row += 1
+        ttk.Separator(params_frame, orient='horizontal').grid(
+            row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5
+        )
+        
+        row += 1
         # Snap angle
         ttk.Label(params_frame, text="Snap Angle (degrees):").grid(
             row=row, column=0, sticky=tk.W, pady=5
         )
-        ttk.Spinbox(
+        self.snap_angle_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=90,
             textvariable=self.snap_angle,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.snap_angle_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Angle increment for snapping").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -122,13 +161,14 @@ class OrthoPhotoConverterGUI:
         row += 1
         # Low threshold
         ttk.Label(params_frame, text="Low Threshold:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(
+        self.low_threshold_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=255,
             textvariable=self.low_threshold,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.low_threshold_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Lower threshold for edge detection").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -136,13 +176,14 @@ class OrthoPhotoConverterGUI:
         row += 1
         # High threshold
         ttk.Label(params_frame, text="High Threshold:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(
+        self.high_threshold_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=255,
             textvariable=self.high_threshold,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.high_threshold_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Upper threshold for edge detection").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -150,13 +191,14 @@ class OrthoPhotoConverterGUI:
         row += 1
         # Line threshold
         ttk.Label(params_frame, text="Line Threshold:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(
+        self.line_threshold_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=500,
             textvariable=self.line_threshold,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.line_threshold_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Accumulator threshold for line detection").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -166,13 +208,14 @@ class OrthoPhotoConverterGUI:
         ttk.Label(params_frame, text="Min Line Length:").grid(
             row=row, column=0, sticky=tk.W, pady=5
         )
-        ttk.Spinbox(
+        self.min_line_length_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=1000,
             textvariable=self.min_line_length,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.min_line_length_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Minimum line length to detect").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -180,13 +223,14 @@ class OrthoPhotoConverterGUI:
         row += 1
         # Max line gap
         ttk.Label(params_frame, text="Max Line Gap:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(
+        self.max_line_gap_spinbox = ttk.Spinbox(
             params_frame,
             from_=1,
             to=100,
             textvariable=self.max_line_gap,
             width=10,
-        ).grid(row=row, column=1, sticky=tk.W, padx=5)
+        )
+        self.max_line_gap_spinbox.grid(row=row, column=1, sticky=tk.W, padx=5)
         ttk.Label(params_frame, text="Maximum gap between line segments").grid(
             row=row, column=2, sticky=tk.W, padx=5
         )
@@ -219,13 +263,18 @@ class OrthoPhotoConverterGUI:
             button_frame, text="Convert", command=self.start_conversion, width=15
         )
         self.convert_button.grid(row=0, column=0, padx=5)
+        
+        self.feedback_button = ttk.Button(
+            button_frame, text="Provide Feedback", command=self.show_feedback_dialog, width=15, state="disabled"
+        )
+        self.feedback_button.grid(row=0, column=1, padx=5)
 
         ttk.Button(button_frame, text="Clear", command=self.clear_fields, width=15).grid(
-            row=0, column=1, padx=5
+            row=0, column=2, padx=5
         )
 
         ttk.Button(button_frame, text="Exit", command=self.on_closing, width=15).grid(
-            row=0, column=2, padx=5
+            row=0, column=3, padx=5
         )
 
         # Configure grid weights
@@ -267,6 +316,126 @@ class OrthoPhotoConverterGUI:
         )
         if filename:
             self.geojson_path.set(filename)
+    
+    def load_learned_parameters(self):
+        """Load learned parameters from feedback history."""
+        if self.use_learned.get():
+            try:
+                params = self.learning_system.get_suggested_parameters(
+                    image_path=self.input_path.get() if self.input_path.get() else None
+                )
+                self.snap_angle.set(params.get('snap_angle', 15))
+                self.low_threshold.set(params.get('low_threshold', 50))
+                self.high_threshold.set(params.get('high_threshold', 150))
+                self.line_threshold.set(params.get('line_threshold', 100))
+                self.min_line_length.set(params.get('min_line_length', 100))
+                self.max_line_gap.set(params.get('max_line_gap', 10))
+            except Exception as e:
+                self.log_message(f"Could not load learned parameters: {e}")
+    
+    def on_use_learned_changed(self):
+        """Handle changes to use learned parameters checkbox."""
+        enabled = not self.use_learned.get()
+        
+        # Enable/disable parameter spinboxes
+        state = "normal" if enabled else "readonly"
+        self.snap_angle_spinbox.config(state=state)
+        self.low_threshold_spinbox.config(state=state)
+        self.high_threshold_spinbox.config(state=state)
+        self.line_threshold_spinbox.config(state=state)
+        self.min_line_length_spinbox.config(state=state)
+        self.max_line_gap_spinbox.config(state=state)
+        
+        # Load learned parameters if checkbox is enabled
+        if self.use_learned.get():
+            self.load_learned_parameters()
+    
+    def show_statistics(self):
+        """Show feedback statistics in a dialog."""
+        stats = self.learning_system.get_statistics()
+        
+        if stats['total_feedback'] == 0:
+            messagebox.showinfo("Feedback Statistics", "No feedback recorded yet.\n\nProvide feedback after conversions to help improve results!")
+            return
+        
+        # Create statistics message
+        msg = f"Total Feedback Entries: {stats['total_feedback']}\n"
+        msg += f"Average Rating: {stats['average_rating']:.2f}/5.0\n\n"
+        msg += "Rating Distribution:\n"
+        for rating in range(5, 0, -1):
+            count = stats['rating_distribution'].get(rating, 0)
+            stars = '★' * rating
+            msg += f"  {stars}: {count}\n"
+        
+        messagebox.showinfo("Feedback Statistics", msg)
+    
+    def show_feedback_dialog(self):
+        """Show dialog to collect user feedback on last conversion."""
+        if not self.last_result or not self.last_parameters:
+            messagebox.showerror("Error", "No conversion result to provide feedback on.")
+            return
+        
+        # Create feedback dialog
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Provide Feedback")
+        dialog.geometry("400x300")
+        dialog.resizable(False, False)
+        
+        # Make it modal
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Rating
+        ttk.Label(dialog, text="How satisfied are you with the result?", font=('', 10, 'bold')).pack(pady=10)
+        
+        rating_var = tk.IntVar(value=3)
+        rating_frame = ttk.Frame(dialog)
+        rating_frame.pack(pady=5)
+        
+        for i in range(1, 6):
+            ttk.Radiobutton(
+                rating_frame,
+                text=f"{'★' * i} ({i}/5)",
+                variable=rating_var,
+                value=i
+            ).pack(anchor=tk.W, padx=20)
+        
+        # Notes
+        ttk.Label(dialog, text="Additional notes (optional):", font=('', 10)).pack(pady=(15, 5))
+        notes_text = tk.Text(dialog, height=5, width=45, wrap=tk.WORD)
+        notes_text.pack(padx=10, pady=5)
+        
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=15)
+        
+        def submit_feedback():
+            try:
+                notes = notes_text.get("1.0", tk.END).strip()
+                self.learning_system.add_feedback(
+                    image_path=self.last_parameters['image_path'],
+                    parameters={
+                        'snap_angle': self.last_parameters['snap_angle'],
+                        'low_threshold': self.last_parameters['low_threshold'],
+                        'high_threshold': self.last_parameters['high_threshold'],
+                        'line_threshold': self.last_parameters['line_threshold'],
+                        'min_line_length': self.last_parameters['min_line_length'],
+                        'max_line_gap': self.last_parameters['max_line_gap']
+                    },
+                    rating=rating_var.get(),
+                    user_notes=notes if notes else None
+                )
+                
+                messagebox.showinfo("Success", "Thank you for your feedback!\n\nYour feedback will help improve future conversions.")
+                dialog.destroy()
+                
+                # Disable feedback button after submitting
+                self.feedback_button.config(state="disabled")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save feedback: {e}")
+        
+        ttk.Button(button_frame, text="Submit", command=submit_feedback, width=12).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy, width=12).pack(side=tk.LEFT, padx=5)
 
     def log_message(self, message):
         """Add a message to the status text area."""
@@ -392,6 +561,18 @@ class OrthoPhotoConverterGUI:
             min_line_length=self.min_line_length.get(),
             max_line_gap=self.max_line_gap.get(),
         )
+        
+        # Store result and parameters for feedback
+        self.last_result = result
+        self.last_parameters = {
+            'image_path': self.input_path.get(),
+            'snap_angle': self.snap_angle.get(),
+            'low_threshold': self.low_threshold.get(),
+            'high_threshold': self.high_threshold.get(),
+            'line_threshold': self.line_threshold.get(),
+            'min_line_length': self.min_line_length.get(),
+            'max_line_gap': self.max_line_gap.get()
+        }
 
         self.log_message("\n✓ Conversion complete!")
         self.log_message(f"  Detected {result['lines_detected']} lines")
@@ -399,6 +580,11 @@ class OrthoPhotoConverterGUI:
         self.log_message(f"  DXF saved to: {result['dxf_path']}")
         if result["geojson_path"]:
             self.log_message(f"  GeoJSON saved to: {result['geojson_path']}")
+        
+        self.log_message("\nYou can now provide feedback on this result!")
+
+        # Enable feedback button
+        self.message_queue.put(("enable_feedback", lambda: self.feedback_button.config(state="normal")))
 
         # Show success message
         self.message_queue.put(
@@ -408,7 +594,8 @@ class OrthoPhotoConverterGUI:
                     "Success",
                     f"Conversion completed successfully!\n\n"
                     f"Lines detected: {res['lines_detected']}\n"
-                    f"Lines snapped: {res['lines_snapped']}",
+                    f"Lines snapped: {res['lines_snapped']}\n\n"
+                    f"You can now provide feedback to help improve future conversions.",
                 ),
             )
         )
