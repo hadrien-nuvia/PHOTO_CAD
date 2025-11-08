@@ -221,9 +221,15 @@ pyinstaller --name="OrthophotoToDXF" ^
   --hidden-import="numpy" ^
   --hidden-import="ezdxf" ^
   --hidden-import="yaml" ^
+  --hidden-import="queue" ^
+  --hidden-import="threading" ^
+  --hidden-import="traceback" ^
+  --hidden-import="atexit" ^
   --collect-all cv2 ^
   --collect-all numpy ^
   --collect-all ezdxf ^
+  --noupx ^
+  --clean ^
   src/gui.py
 ```
 
@@ -237,9 +243,15 @@ pyinstaller --name="OrthophotoToDXF" \
   --hidden-import="numpy" \
   --hidden-import="ezdxf" \
   --hidden-import="yaml" \
+  --hidden-import="queue" \
+  --hidden-import="threading" \
+  --hidden-import="traceback" \
+  --hidden-import="atexit" \
   --collect-all cv2 \
   --collect-all numpy \
   --collect-all ezdxf \
+  --noupx \
+  --clean \
   src/gui.py
 ```
 
