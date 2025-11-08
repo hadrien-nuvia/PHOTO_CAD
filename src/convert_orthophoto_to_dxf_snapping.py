@@ -43,12 +43,32 @@ def convert_orthophoto_to_dxf(
         line_threshold: Accumulator threshold for Hough line detection (default: 100).
         min_line_length: Minimum line length to detect (default: 100).
         max_line_gap: Maximum gap between line segments (default: 10).
+
+    Returns:
+        Dictionary with conversion results.
+
+    Raises:
+        FileNotFoundError: If input image doesn't exist.
+        ValueError: If parameters are invalid.
+        Exception: For other processing errors.
     """
+    # Validate inputs
+    if not image_path or not isinstance(image_path, str):
+        raise ValueError("Invalid image_path")
+    if not dxf_output_path or not isinstance(dxf_output_path, str):
+        raise ValueError("Invalid dxf_output_path")
+
     # Read and process the image
     image = read_image(image_path)
 
+    if image is None or image.size == 0:
+        raise ValueError("Failed to read image or image is empty")
+
     # Detect edges
     edges = detect_edges(image, low_threshold, high_threshold)
+
+    if edges is None or edges.size == 0:
+        raise ValueError("Failed to detect edges")
 
     # Detect lines
     lines = detect_lines(edges, line_threshold, min_line_length, max_line_gap)
