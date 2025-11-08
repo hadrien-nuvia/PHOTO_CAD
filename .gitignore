@@ -53,3 +53,8 @@ test_output.*
 *.log
 *.tmp
 /tmp/
+
+# PyInstaller
+*.spec
+build/
+dist/

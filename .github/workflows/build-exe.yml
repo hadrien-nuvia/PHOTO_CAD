@@ -1,0 +1,201 @@
+name: Build Standalone EXE with GUI
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --name="OrthophotoToDXF" ^
+          --onefile ^
+          --windowed ^
+          --icon=NONE ^
+          --add-data "src;src" ^
+          --hidden-import="cv2" ^
+          --hidden-import="numpy" ^
+          --hidden-import="ezdxf" ^
+          --hidden-import="yaml" ^
+          --collect-all cv2 ^
+          --collect-all numpy ^
+          --collect-all ezdxf ^
+          src/gui.py
+          
+    - name: Test executable exists
+      run: |
+        if (Test-Path "dist/OrthophotoToDXF.exe") {
+          Write-Host "Executable built successfully"
+          Get-Item "dist/OrthophotoToDXF.exe" | Select-Object Name, Length, LastWriteTime
+        } else {
+          Write-Error "Executable not found!"
+          exit 1
+        }
+      shell: powershell
+      
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OrthophotoToDXF-Windows
+        path: dist/OrthophotoToDXF.exe
+        retention-days: 30
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/OrthophotoToDXF.exe
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-glx libglib2.0-0
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --name="OrthophotoToDXF" \
+          --onefile \
+          --windowed \
+          --add-data "src:src" \
+          --hidden-import="cv2" \
+          --hidden-import="numpy" \
+          --hidden-import="ezdxf" \
+          --hidden-import="yaml" \
+          --collect-all cv2 \
+          --collect-all numpy \
+          --collect-all ezdxf \
+          src/gui.py
+          
+    - name: Test executable exists
+      run: |
+        if [ -f "dist/OrthophotoToDXF" ]; then
+          echo "Executable built successfully"
+          ls -lh dist/OrthophotoToDXF
+          chmod +x dist/OrthophotoToDXF
+        else
+          echo "Executable not found!"
+          exit 1
+        fi
+      
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OrthophotoToDXF-Linux
+        path: dist/OrthophotoToDXF
+        retention-days: 30
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/OrthophotoToDXF
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --name="OrthophotoToDXF" \
+          --onefile \
+          --windowed \
+          --add-data "src:src" \
+          --hidden-import="cv2" \
+          --hidden-import="numpy" \
+          --hidden-import="ezdxf" \
+          --hidden-import="yaml" \
+          --collect-all cv2 \
+          --collect-all numpy \
+          --collect-all ezdxf \
+          src/gui.py
+          
+    - name: Test executable exists
+      run: |
+        if [ -f "dist/OrthophotoToDXF" ]; then
+          echo "Executable built successfully"
+          ls -lh dist/OrthophotoToDXF
+          chmod +x dist/OrthophotoToDXF
+        else
+          echo "Executable not found!"
+          exit 1
+        fi
+      
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OrthophotoToDXF-macOS
+        path: dist/OrthophotoToDXF
+        retention-days: 30
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/OrthophotoToDXF
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

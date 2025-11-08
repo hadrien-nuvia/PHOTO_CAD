@@ -10,15 +10,28 @@ A Python tool for converting orthophoto images to DXF (Drawing Exchange Format) 
 - **Angle Snapping**: Snaps detected lines to dominant angles for cleaner CAD drawings
 - **Multiple Output Formats**: Exports to both DXF and GeoJSON formats
 - **Configurable Parameters**: Customizable detection and snapping parameters
+- **GUI Application**: User-friendly graphical interface for easy conversions
+- **Standalone Executable**: Pre-built executables available for Windows, Linux, and macOS
 
 ## Installation
 
-### Prerequisites
+### Using Pre-built Executables (Recommended)
+
+Download the latest standalone executable for your platform from the [Releases](https://github.com/hadrien-nuvia/PHOTO_CAD/releases) page:
+- **Windows**: `OrthophotoToDXF.exe`
+- **Linux**: `OrthophotoToDXF`
+- **macOS**: `OrthophotoToDXF`
+
+No Python installation required! Just download and run the executable.
+
+### From Source
+
+#### Prerequisites
 
 - Python 3.8 or higher
 - pip package manager
 
-### Install Dependencies
+#### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -38,6 +51,7 @@ convert-orthophoto-to-dxf/
 │   ├── __init__.py                                # Package initialization
 │   ├── convert_orthophoto_to_dxf_snapping.py     # Main conversion module
 │   ├── cli.py                                     # Command-line interface
+│   ├── gui.py                                     # Graphical user interface
 │   ├── config.py                                  # Configuration management
 │   ├── types.py                                   # Type definitions
 │   └── core/
@@ -53,6 +67,9 @@ convert-orthophoto-to-dxf/
 │   └── test_dxf_export.py                         # Tests for export functions
 ├── examples/
 │   └── sample_config.yaml                         # Example configuration file
+├── .github/
+│   └── workflows/
+│       └── build-exe.yml                          # GitHub Actions workflow for building executables
 ├── .gitignore                                     # Git ignore rules
 ├── LICENSE                                        # MIT License
 ├── README.md                                      # This file
@@ -61,6 +78,25 @@ convert-orthophoto-to-dxf/
 ```
 
 ## Usage
+
+### Graphical User Interface (GUI)
+
+The easiest way to use the tool is through the GUI application:
+
+#### Using Standalone Executable
+Simply double-click the downloaded executable (`OrthophotoToDXF.exe` on Windows, or `OrthophotoToDXF` on Linux/macOS).
+
+#### From Source
+```bash
+python -m src.gui
+```
+
+The GUI provides:
+- File browser for selecting input images and output locations
+- Adjustable parameters with helpful tooltips
+- Real-time progress indication
+- Status messages showing conversion progress
+- Support for optional GeoJSON export
 
 ### Command Line Interface
 
@@ -151,6 +187,63 @@ Run a specific test file:
 ```bash
 pytest tests/test_dxf_export.py
 ```
+
+## Building Standalone Executables
+
+### Automatic Build via GitHub Actions
+
+Executables are automatically built for Windows, Linux, and macOS when you:
+1. Push to the `main` branch
+2. Create a pull request
+3. Create a tag starting with `v` (e.g., `v1.0.0`)
+4. Manually trigger the workflow
+
+The built executables are available as artifacts in the GitHub Actions run, and are automatically attached to releases when you create a version tag.
+
+### Manual Build with PyInstaller
+
+To build an executable locally:
+
+1. Install PyInstaller:
+```bash
+pip install pyinstaller
+```
+
+2. Build the executable:
+
+**Windows:**
+```bash
+pyinstaller --name="OrthophotoToDXF" ^
+  --onefile ^
+  --windowed ^
+  --add-data "src;src" ^
+  --hidden-import="cv2" ^
+  --hidden-import="numpy" ^
+  --hidden-import="ezdxf" ^
+  --hidden-import="yaml" ^
+  --collect-all cv2 ^
+  --collect-all numpy ^
+  --collect-all ezdxf ^
+  src/gui.py
+```
+
+**Linux/macOS:**
+```bash
+pyinstaller --name="OrthophotoToDXF" \
+  --onefile \
+  --windowed \
+  --add-data "src:src" \
+  --hidden-import="cv2" \
+  --hidden-import="numpy" \
+  --hidden-import="ezdxf" \
+  --hidden-import="yaml" \
+  --collect-all cv2 \
+  --collect-all numpy \
+  --collect-all ezdxf \
+  src/gui.py
+```
+
+3. Find the executable in the `dist/` directory.
 
 ## Development
 
