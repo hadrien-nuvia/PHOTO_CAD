@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from core.snapping import snap_to_grid, snap_to_angles, snap_lines
 
@@ -50,5 +50,5 @@ class TestSnapping(unittest.TestCase):
         self.assertTrue(len(result) > 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

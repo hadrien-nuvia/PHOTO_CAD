@@ -6,11 +6,11 @@ import numpy as np
 def snap_to_grid(lines, grid_size):
     """
     Snap line endpoints to a grid.
-    
+
     Args:
         lines: List of lines, where each line is a list of points [(x, y), ...].
         grid_size: Size of the grid cell.
-        
+
     Returns:
         Lines with endpoints snapped to the grid.
     """
@@ -20,7 +20,7 @@ def snap_to_grid(lines, grid_size):
         for point in line:
             snapped_point = (
                 round(point[0] / grid_size) * grid_size,
-                round(point[1] / grid_size) * grid_size
+                round(point[1] / grid_size) * grid_size,
             )
             snapped_line.append(snapped_point)
         snapped_lines.append(snapped_line)
@@ -30,11 +30,11 @@ def snap_to_grid(lines, grid_size):
 def snap_to_angles(lines, snap_angle=15):
     """
     Snap lines to dominant angles.
-    
+
     Args:
         lines: Array of lines in format [[x1, y1, x2, y2], ...].
         snap_angle: Angle increment in degrees to snap to.
-        
+
     Returns:
         Lines with angles snapped to multiples of snap_angle.
     """
@@ -56,18 +56,18 @@ def snap_to_angles(lines, snap_angle=15):
 def snap_lines(lines, snap_angle=15, grid_size=None):
     """
     Snap lines to angles and optionally to a grid.
-    
+
     Args:
         lines: Array of lines in format [[x1, y1, x2, y2], ...].
         snap_angle: Angle increment in degrees to snap to.
         grid_size: Optional grid size for grid snapping.
-        
+
     Returns:
         Snapped lines.
     """
     # First snap to angles
     snapped = snap_to_angles(lines, snap_angle)
-    
+
     # Optionally snap to grid
     if grid_size is not None:
         # Convert to point format for grid snapping
@@ -75,5 +75,5 @@ def snap_lines(lines, snap_angle=15, grid_size=None):
         snapped_grid = snap_to_grid(lines_as_points, grid_size)
         # Convert back to line format
         snapped = [(p1[0], p1[1], p2[0], p2[1]) for p1, p2 in snapped_grid]
-    
+
     return snapped
