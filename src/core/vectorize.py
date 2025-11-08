@@ -16,16 +16,25 @@ def detect_lines(edges, threshold=100, min_line_length=100, max_line_gap=10):
 
     Returns:
         Array of detected lines, each line defined by [x1, y1, x2, y2].
+
+    Raises:
+        ValueError: If edge image is invalid.
     """
-    lines = cv2.HoughLinesP(
-        edges,
-        1,
-        np.pi / 180,
-        threshold=threshold,
-        minLineLength=min_line_length,
-        maxLineGap=max_line_gap,
-    )
-    return lines if lines is not None else []
+    if edges is None or edges.size == 0:
+        raise ValueError("Invalid edge image for line detection")
+
+    try:
+        lines = cv2.HoughLinesP(
+            edges,
+            1,
+            np.pi / 180,
+            threshold=threshold,
+            minLineLength=min_line_length,
+            maxLineGap=max_line_gap,
+        )
+        return lines if lines is not None else []
+    except Exception as e:
+        raise ValueError(f"Line detection failed: {str(e)}")
 
 
 def simplify_lines(lines, epsilon=1.0):

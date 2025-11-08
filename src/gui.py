@@ -4,6 +4,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import threading
+import sys
+import traceback
+import queue
+import atexit
 
 # Support both relative imports (when used as module) and absolute imports (when run directly)
 try:
@@ -37,7 +41,19 @@ class OrthoPhotoConverterGUI:
         self.max_line_gap = tk.IntVar(value=10)
         self.enable_geojson = tk.BooleanVar(value=False)
 
+        # Thread management
+        self.worker_thread = None
+        self.is_running = False
+        self.message_queue = queue.Queue()
+
+        # Set up proper cleanup handlers
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        atexit.register(self.cleanup)
+
         self.create_widgets()
+
+        # Start message queue processing
+        self.process_queue()
 
     def create_widgets(self):
         """Create and layout all GUI widgets."""
@@ -253,16 +269,26 @@ class OrthoPhotoConverterGUI:
 
     def log_message(self, message):
         """Add a message to the status text area."""
-        self.status_text.config(state="normal")
-        self.status_text.insert(tk.END, message + "\n")
-        self.status_text.see(tk.END)
-        self.status_text.config(state="disabled")
+
+        def _log():
+            self.status_text.config(state="normal")
+            self.status_text.insert(tk.END, message + "\n")
+            self.status_text.see(tk.END)
+            self.status_text.config(state="disabled")
+
+        # Queue the log message for thread-safe execution
+        self.message_queue.put(("log", _log))
 
     def clear_status(self):
         """Clear the status text area."""
-        self.status_text.config(state="normal")
-        self.status_text.delete(1.0, tk.END)
-        self.status_text.config(state="disabled")
+
+        def _clear():
+            self.status_text.config(state="normal")
+            self.status_text.delete(1.0, tk.END)
+            self.status_text.config(state="disabled")
+
+        # Queue the clear operation for thread-safe execution
+        self.message_queue.put(("clear", _clear))
 
     def clear_fields(self):
         """Clear all input fields."""
@@ -298,85 +324,142 @@ class OrthoPhotoConverterGUI:
         if not self.validate_inputs():
             return
 
+        # Don't start if already running
+        if self.is_running:
+            messagebox.showwarning("Warning", "A conversion is already in progress.")
+            return
+
         # Disable convert button
         self.convert_button.config(state="disabled")
         self.clear_status()
         self.progress.start()
+        self.is_running = True
 
-        # Run conversion in a separate thread to keep GUI responsive
-        thread = threading.Thread(target=self.run_conversion, daemon=True)
-        thread.start()
+        # Run conversion in a separate thread (not daemon for proper cleanup)
+        self.worker_thread = threading.Thread(target=self.run_conversion_safe, daemon=False)
+        self.worker_thread.start()
+
+    def run_conversion_safe(self):
+        """Wrapper for run_conversion with proper exception handling."""
+        try:
+            self.run_conversion()
+        except Exception as e:
+            # Catch any unhandled exceptions
+            error_msg = f"Unexpected error: {str(e)}\n{traceback.format_exc()}"
+            self.log_message(f"\n✗ Error: {error_msg}")
+            self.message_queue.put(
+                (
+                    "error",
+                    lambda msg=str(e): messagebox.showerror("Error", f"Conversion failed:\n{msg}"),
+                )
+            )
+        finally:
+            # Always clean up
+            self.is_running = False
+            self.message_queue.put(("cleanup", lambda: self.convert_button.config(state="normal")))
+            self.message_queue.put(("stop_progress", self.progress.stop))
 
     def run_conversion(self):
         """Run the actual conversion process."""
-        try:
-            self.log_message("Starting conversion...")
-            self.log_message(f"Input: {self.input_path.get()}")
-            self.log_message(f"Output DXF: {self.output_path.get()}")
+        self.log_message("Starting conversion...")
+        self.log_message(f"Input: {self.input_path.get()}")
+        self.log_message(f"Output DXF: {self.output_path.get()}")
 
-            geojson_output = self.geojson_path.get() if self.enable_geojson.get() else None
-            if geojson_output:
-                self.log_message(f"Output GeoJSON: {geojson_output}")
+        geojson_output = self.geojson_path.get() if self.enable_geojson.get() else None
+        if geojson_output:
+            self.log_message(f"Output GeoJSON: {geojson_output}")
 
-            self.log_message("\nParameters:")
-            self.log_message(f"  Snap angle: {self.snap_angle.get()}°")
-            self.log_message(
-                f"  Edge detection: {self.low_threshold.get()}-{self.high_threshold.get()}"
-            )
-            self.log_message(f"  Line threshold: {self.line_threshold.get()}")
-            self.log_message(f"  Min line length: {self.min_line_length.get()}")
-            self.log_message(f"  Max line gap: {self.max_line_gap.get()}")
+        self.log_message("\nParameters:")
+        self.log_message(f"  Snap angle: {self.snap_angle.get()}°")
+        self.log_message(
+            f"  Edge detection: {self.low_threshold.get()}-{self.high_threshold.get()}"
+        )
+        self.log_message(f"  Line threshold: {self.line_threshold.get()}")
+        self.log_message(f"  Min line length: {self.min_line_length.get()}")
+        self.log_message(f"  Max line gap: {self.max_line_gap.get()}")
 
-            self.log_message("\nProcessing...")
+        self.log_message("\nProcessing...")
 
-            result = convert_orthophoto_to_dxf(
-                image_path=self.input_path.get(),
-                dxf_output_path=self.output_path.get(),
-                geojson_output_path=geojson_output,
-                snap_angle=self.snap_angle.get(),
-                low_threshold=self.low_threshold.get(),
-                high_threshold=self.high_threshold.get(),
-                line_threshold=self.line_threshold.get(),
-                min_line_length=self.min_line_length.get(),
-                max_line_gap=self.max_line_gap.get(),
-            )
+        result = convert_orthophoto_to_dxf(
+            image_path=self.input_path.get(),
+            dxf_output_path=self.output_path.get(),
+            geojson_output_path=geojson_output,
+            snap_angle=self.snap_angle.get(),
+            low_threshold=self.low_threshold.get(),
+            high_threshold=self.high_threshold.get(),
+            line_threshold=self.line_threshold.get(),
+            min_line_length=self.min_line_length.get(),
+            max_line_gap=self.max_line_gap.get(),
+        )
 
-            self.log_message("\n✓ Conversion complete!")
-            self.log_message(f"  Detected {result['lines_detected']} lines")
-            self.log_message(f"  Snapped to {result['lines_snapped']} lines")
-            self.log_message(f"  DXF saved to: {result['dxf_path']}")
-            if result["geojson_path"]:
-                self.log_message(f"  GeoJSON saved to: {result['geojson_path']}")
+        self.log_message("\n✓ Conversion complete!")
+        self.log_message(f"  Detected {result['lines_detected']} lines")
+        self.log_message(f"  Snapped to {result['lines_snapped']} lines")
+        self.log_message(f"  DXF saved to: {result['dxf_path']}")
+        if result["geojson_path"]:
+            self.log_message(f"  GeoJSON saved to: {result['geojson_path']}")
 
-            # Show success message
-            self.root.after(
-                0,
-                lambda: messagebox.showinfo(
+        # Show success message
+        self.message_queue.put(
+            (
+                "success",
+                lambda res=result: messagebox.showinfo(
                     "Success",
                     f"Conversion completed successfully!\n\n"
-                    f"Lines detected: {result['lines_detected']}\n"
-                    f"Lines snapped: {result['lines_snapped']}",
+                    f"Lines detected: {res['lines_detected']}\n"
+                    f"Lines snapped: {res['lines_snapped']}",
                 ),
             )
+        )
 
-        except Exception as err:
-            error_msg = str(err)
-            self.log_message(f"\n✗ Error: {error_msg}")
-            self.root.after(
-                0, lambda msg=error_msg: messagebox.showerror("Error", f"Conversion failed:\n{msg}")
-            )
-
+    def process_queue(self):
+        """Process messages from the worker thread in a thread-safe manner."""
+        try:
+            while True:
+                try:
+                    msg_type, callback = self.message_queue.get_nowait()
+                    callback()
+                except queue.Empty:
+                    break
+        except Exception as e:
+            print(f"Error processing queue: {e}", file=sys.stderr)
         finally:
-            # Re-enable button and stop progress
-            self.root.after(0, lambda: self.convert_button.config(state="normal"))
-            self.root.after(0, self.progress.stop)
+            # Schedule next check
+            if self.root and self.root.winfo_exists():
+                self.root.after(100, self.process_queue)
+
+    def on_closing(self):
+        """Handle window close event."""
+        if self.is_running:
+            if messagebox.askokcancel(
+                "Quit", "A conversion is in progress. Are you sure you want to quit?"
+            ):
+                self.cleanup()
+                self.root.destroy()
+        else:
+            self.cleanup()
+            self.root.destroy()
+
+    def cleanup(self):
+        """Clean up resources before exit."""
+        self.is_running = False
+        # Wait for worker thread to finish (with timeout)
+        if self.worker_thread and self.worker_thread.is_alive():
+            self.worker_thread.join(timeout=2.0)
 
 
 def main():
     """Main entry point for the GUI application."""
-    root = tk.Tk()
-    OrthoPhotoConverterGUI(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        OrthoPhotoConverterGUI(root)  # Keep reference in root widget
+        root.mainloop()
+    except Exception as e:
+        # Catch any uncaught exceptions at top level
+        print(f"Fatal error: {e}", file=sys.stderr)
+        traceback.print_exc()
+        messagebox.showerror("Fatal Error", f"Application error:\n{str(e)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

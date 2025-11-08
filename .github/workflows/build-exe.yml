@@ -44,9 +44,15 @@ jobs:
           --hidden-import="numpy" ^
           --hidden-import="ezdxf" ^
           --hidden-import="yaml" ^
+          --hidden-import="queue" ^
+          --hidden-import="threading" ^
+          --hidden-import="traceback" ^
+          --hidden-import="atexit" ^
           --collect-all cv2 ^
           --collect-all numpy ^
           --collect-all ezdxf ^
+          --noupx ^
+          --clean ^
           src/gui.py
       shell: cmd
           
@@ -114,9 +120,15 @@ jobs:
           --hidden-import="numpy" \
           --hidden-import="ezdxf" \
           --hidden-import="yaml" \
+          --hidden-import="queue" \
+          --hidden-import="threading" \
+          --hidden-import="traceback" \
+          --hidden-import="atexit" \
           --collect-all cv2 \
           --collect-all numpy \
           --collect-all ezdxf \
+          --noupx \
+          --clean \
           src/gui.py
           
     - name: Test executable exists
@@ -177,9 +189,15 @@ jobs:
           --hidden-import="numpy" \
           --hidden-import="ezdxf" \
           --hidden-import="yaml" \
+          --hidden-import="queue" \
+          --hidden-import="threading" \
+          --hidden-import="traceback" \
+          --hidden-import="atexit" \
           --collect-all cv2 \
           --collect-all numpy \
           --collect-all ezdxf \
+          --noupx \
+          --clean \
           src/gui.py
           
     - name: Test executable exists
