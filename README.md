@@ -10,6 +10,7 @@ A Python tool for converting orthophoto images to DXF (Drawing Exchange Format) 
 - **Angle Snapping**: Snaps detected lines to dominant angles for cleaner CAD drawings
 - **Multiple Output Formats**: Exports to both DXF and GeoJSON formats
 - **Configurable Parameters**: Customizable detection and snapping parameters
+- **Self-Improving System**: Learns from user feedback to suggest optimal parameters
 - **GUI Application**: User-friendly graphical interface for easy conversions
 - **Standalone Executable**: Pre-built executables available for Windows, Linux, and macOS
 
@@ -53,6 +54,7 @@ convert-orthophoto-to-dxf/
 │   ├── cli.py                                     # Command-line interface
 │   ├── gui.py                                     # Graphical user interface
 │   ├── config.py                                  # Configuration management
+│   ├── learning.py                                # Self-improving learning system
 │   ├── types.py                                   # Type definitions
 │   └── core/
 │       ├── __init__.py                            # Core module exports
@@ -64,7 +66,8 @@ convert-orthophoto-to-dxf/
 │   ├── __init__.py
 │   ├── test_raster.py                             # Tests for raster processing
 │   ├── test_snapping.py                           # Tests for snapping functions
-│   └── test_dxf_export.py                         # Tests for export functions
+│   ├── test_dxf_export.py                         # Tests for export functions
+│   └── test_learning.py                           # Tests for learning system
 ├── examples/
 │   └── sample_config.yaml                         # Example configuration file
 ├── .github/
@@ -97,6 +100,9 @@ The GUI provides:
 - Real-time progress indication
 - Status messages showing conversion progress
 - Support for optional GeoJSON export
+- **"Use learned parameters"** checkbox to automatically apply optimal settings
+- **"View Stats"** button to see feedback statistics
+- **"Provide Feedback"** button to rate conversion results and help improve future conversions
 
 ### Command Line Interface
 
@@ -158,6 +164,68 @@ result = convert_orthophoto_to_dxf(
 print(f"Detected {result['lines_detected']} lines")
 print(f"Snapped to {result['lines_snapped']} lines")
 ```
+
+## Self-Improving System
+
+The tool includes a self-improving system that learns from user feedback to suggest optimal parameters for future conversions. This feature helps improve conversion quality over time by learning which parameter combinations work best for different types of images.
+
+### How It Works
+
+1. **Perform a conversion** using the GUI or CLI
+2. **Provide feedback** by rating the result (1-5 stars) and optionally adding notes
+3. **The system learns** from your feedback and stores successful parameter combinations
+4. **Future conversions** can use learned parameters for better results
+
+### Using Learned Parameters
+
+#### In the GUI
+
+1. Check the **"Use learned parameters from feedback"** checkbox
+2. The tool will automatically suggest parameters based on previous successful conversions
+3. Parameters are customized based on similar images when possible
+4. View statistics by clicking the **"View Stats"** button
+
+#### In the CLI
+
+Use learned parameters for a conversion:
+```bash
+python -m src.cli convert input.jpg output.dxf --use-learned
+```
+
+Provide feedback after a conversion:
+```bash
+python -m src.cli feedback input.jpg --rating 5 --notes "Excellent result!"
+```
+
+View feedback statistics:
+```bash
+python -m src.cli stats
+```
+
+The feedback command accepts all the parameters that were used in the conversion:
+```bash
+python -m src.cli feedback input.jpg \
+  --rating 4 \
+  --notes "Good but could be better" \
+  --snap-angle 15 \
+  --low-threshold 50 \
+  --high-threshold 150
+```
+
+### Feedback Storage
+
+Feedback is stored in `feedback_history.json` in the current directory. This file contains:
+- Image paths
+- Parameters used for each conversion
+- User ratings (1-5 stars)
+- Optional notes
+- Timestamps
+
+The system automatically:
+- Averages parameters from highly-rated conversions
+- Prioritizes similar images when suggesting parameters
+- Filters out low-rated results
+- Maintains a history of all feedback for continuous improvement
 
 ## Configuration
 
